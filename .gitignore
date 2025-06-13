@@ -1,0 +1,75 @@
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# NetBeans
+nbproject/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# VSCode
+.vscode/
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+.gradletasknamecache
+
+# Java
+*.class
+*.log
+*.jar
+hs_err_pid*
+replay_pid*
+
+# Minecraft specifico
+*.zip
+*.rar
+*.tar.gz
+
+# Config e file da non tracciare
+config.yml
+plugin.yml.bak
+*.db
+*.sqlite
+*.properties
+!gradle-wrapper.properties
+
+# Logs e file temporanei
+logs/
+*.log
+tmp/
+temp/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

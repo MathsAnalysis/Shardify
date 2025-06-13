@@ -1,0 +1,89 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id("com.gradleup.shadow") version "9.0.0-beta8"
+}
+
+
+def name = 'Shardify'
+def artifactId = 'shardify-load'
+def groupId = 'it.mathsanalysis.load'
+
+group = 'it.mathsanalysis.load'
+version = '1.0.0'
+
+
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(23))
+}
+
+tasks.withType(Test).configureEach {
+    jvmArgs += '--enable-preview'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ['--enable-preview']
+    options.release = 23
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    compileOnly 'io.micrometer:micrometer-core:1.12.0'
+    compileOnly 'org.springframework.boot:spring-boot-starter:3.2.0'
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.2.0'
+
+    implementation 'com.zaxxer:HikariCP:6.3.0'
+
+    implementation 'net.sf.trove4j:trove4j:3.0.3'        // Primitive collections
+    implementation 'it.unimi.dsi:fastutil-core:8.5.15'   // Already present, good
+
+    // Annotations and Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
+
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.2.1' // Caching library
+
+    // Testing dependencies
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testImplementation 'org.testcontainers:junit-jupiter:1.19.0'
+    testImplementation 'org.testcontainers:postgresql:1.19.0'
+}
+
+tasks {
+    compileJava {
+        dependsOn clean
+        options.encoding = 'UTF-8'
+    }
+
+    build {
+        dependsOn shadowJar
+        dependsOn publish
+    }
+}
+
+shadowJar {
+    archiveFileName = name + '-' + version + '.jar'
+    minimize()
+}
+
+jar{
+    archiveFileName = name + '-' + version + '.jar'
+}
+
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = groupId
+            artifactId = artifactId
+
+            from components.java
+        }
+    }
+}
+
+
