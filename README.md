@@ -393,5 +393,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 - 📧 [Email](mailto:carlo4340@outlook.it)
 
 ---
-
-*Built with ❤️ for the Java community. Embrace the future of data persistence.*
