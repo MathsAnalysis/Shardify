@@ -34,7 +34,7 @@ public class AnnotationProcessor {
         // @NotNull validation
         if (field.isAnnotationPresent(NotNull.class) && value == null) {
             var annotation = field.getAnnotation(NotNull.class);
-            errors.add(annotation.message() + " (field: " + field.getName() + ")");
+            errors.add(Objects.requireNonNull(annotation).message() + " (field: " + field.getName() + ")");
         }
         
         // @Size validation
