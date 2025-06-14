@@ -378,13 +378,6 @@ cd Shardify
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## 🔮 Future Roadmap
-
-- **Q1 2024**: Stable API, comprehensive testing
-- **Q2 2024**: Advanced query DSL, schema migrations
-- **Q3 2024**: Distributed caching, clustering support
-- **Q4 2024**: 1.0 GA release
-
 ## 📞 Support
 
 - 📖 [Documentation](https://github.com/mathsanalysis/Shardify/wiki) Not exist for now
