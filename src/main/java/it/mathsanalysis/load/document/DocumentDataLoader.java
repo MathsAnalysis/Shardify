@@ -12,26 +12,6 @@ import java.util.*;
  * Document database implementation for NoSQL databases.
  *
  * Optimized for document databases like MongoDB, CouchDB, DynamoDB, etc.
- * Features:
- * - Schema-less document operations
- * - Flexible serialization strategies
- * - Index management
- * - Aggregation pipeline support
- * - Full-text search capabilities
- * - Geospatial query support
- *
- * Performance Optimizations:
- * - Bulk operations for batch inserts
- * - Connection pooling
- * - Document serialization caching
- * - Query result caching
- * - Lazy loading for large documents
- *
- * Thread Safety: This class is thread-safe and can be used concurrently
- * from multiple threads.
- *
- * @param <T> The type of items being loaded/saved
- * @param <ID> The type of item identifiers
  */
 public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID> {
 
@@ -81,7 +61,7 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
         var insertResult = collection.insertOne(document);
 
         // Deserialize back to get any generated fields (ID, timestamps, etc.)
-        return serializer.deserialize(document, getItemType());
+        return serializer.deserialize(document, itemType);
     }
 
     @Override
@@ -98,7 +78,7 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
         var insertResult = collection.insertMany(documents);
 
         // Deserialize back to get generated fields
-        return serializer.deserialize(documents, getItemType());
+        return serializer.deserialize(documents, itemType);
     }
 
     @Override
@@ -111,7 +91,7 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
         var document = collection.findOne(query);
 
         if (document != null) {
-            var item = serializer.deserialize(document, getItemType());
+            var item = serializer.deserialize(document, itemType);
             return Optional.of(item);
         } else {
             return Optional.empty();
@@ -201,10 +181,10 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var query = queryBuilder.buildFindQuery(criteria, parameters);
             var documents = collection.find(query);
 
-            var results = serializer.deserialize(documents, getItemType());
+            var results = serializer.deserialize(documents, itemType);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("findByCriteria", System.nanoTime() - startTime);
+                metrics.recordOperation("findByCriteria", System.nanoTime() - startTime);
             }
 
             return results;
@@ -230,10 +210,10 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var query = queryBuilder.buildFindQuery(criteria, parameters);
             var documents = collection.find(query, limit);
 
-            var results = serializer.deserialize(documents, getItemType());
+            var results = serializer.deserialize(documents, itemType);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("findByCriteriaWithLimit", System.nanoTime() - startTime);
+                metrics.recordOperation("findByCriteriaWithLimit", System.nanoTime() - startTime);
             }
 
             return results;
@@ -258,7 +238,7 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var count = collection.countDocuments(query);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("countByCriteria", System.nanoTime() - startTime);
+                metrics.recordOperation("countByCriteria", System.nanoTime() - startTime);
             }
 
             return count;
@@ -286,7 +266,7 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var result = collection.replaceOne(updateQuery, document);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("update", System.nanoTime() - startTime);
+                metrics.recordOperation("update", System.nanoTime() - startTime);
             }
 
             return item;
@@ -315,7 +295,7 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var result = collection.deleteOne(query);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("deleteById", System.nanoTime() - startTime);
+                metrics.recordOperation("deleteById", System.nanoTime() - startTime);
             }
 
             return result != null; // Implementation-specific
@@ -341,10 +321,10 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
 
             // Execute aggregation - implementation specific
             var documents = collection.aggregate(aggregationQuery);
-            var results = serializer.deserialize(documents, getItemType());
+            var results = serializer.deserialize(documents, itemType);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("aggregate", System.nanoTime() - startTime);
+                metrics.recordOperation("aggregate", System.nanoTime() - startTime);
             }
 
             return results;
@@ -369,10 +349,10 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var searchQuery = queryBuilder.buildTextSearchQuery(searchText, parameters);
             var documents = collection.find(searchQuery);
 
-            var results = serializer.deserialize(documents, getItemType());
+            var results = serializer.deserialize(documents, itemType);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("textSearch", System.nanoTime() - startTime);
+                metrics.recordOperation("textSearch", System.nanoTime() - startTime);
             }
 
             return results;
@@ -398,7 +378,7 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var distinctValues = collection.distinct(fieldName, query);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("getDistinctValues", System.nanoTime() - startTime);
+                metrics.recordOperation("getDistinctValues", System.nanoTime() - startTime);
             }
 
             return distinctValues;
@@ -420,7 +400,7 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             database.createIndex(collectionName, indexSpec, options);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("createIndex", 0);
+                metrics.recordOperation("createIndex", 0);
             }
 
         } catch (Exception e) {
@@ -443,10 +423,10 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var geoQuery = queryBuilder.buildGeospatialQuery(location, parameters);
             var documents = collection.find(geoQuery);
 
-            var results = serializer.deserialize(documents, getItemType());
+            var results = serializer.deserialize(documents, itemType);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("findNear", System.nanoTime() - startTime);
+                metrics.recordOperation("findNear", System.nanoTime() - startTime);
             }
 
             return results;
@@ -472,10 +452,10 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
             var regexQuery = queryBuilder.buildRegexQuery(field, pattern, options);
             var documents = collection.find(regexQuery);
 
-            var results = serializer.deserialize(documents, getItemType());
+            var results = serializer.deserialize(documents, itemType);
 
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("findByRegex", System.nanoTime() - startTime);
+                metrics.recordOperation("findByRegex", System.nanoTime() - startTime);
             }
 
             return results;
@@ -535,6 +515,6 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
     public void resetStats() {
         serializer.resetSerializationStats();
         queryBuilder.resetQueryStats();
-        getMetrics().resetStats();
+        metrics.resetStats();
     }
 }

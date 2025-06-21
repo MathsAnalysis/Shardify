@@ -79,7 +79,7 @@ public final class MongoDataLoader<T, ID> extends DocumentDataLoader<T, ID> {
             var result = collection.bulkWrite(operations, options);
             
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("executeBulkWrite", System.nanoTime() - startTime);
+                metrics.recordOperation("executeBulkWrite", System.nanoTime() - startTime);
             }
             
             return result;
@@ -113,14 +113,14 @@ public final class MongoDataLoader<T, ID> extends DocumentDataLoader<T, ID> {
             } else {
                 // Execute normal aggregation
                 var documents = collection.aggregate(getQueryBuilder().buildAggregationQuery(pipeline, options));
-                return getSerializer().deserialize(documents, getItemType());
+                return getSerializer().deserialize(documents, itemType);
             }
             
         } catch (Exception e) {
             throw new RuntimeException("Failed to execute aggregation in collection: " + getCollectionName(), e);
         } finally {
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("aggregateWithExplain", System.nanoTime() - startTime);
+                metrics.recordOperation("aggregateWithExplain", System.nanoTime() - startTime);
             }
         }
     }
@@ -299,7 +299,7 @@ public final class MongoDataLoader<T, ID> extends DocumentDataLoader<T, ID> {
                 session.commitTransaction();
 
                 if (isMetricsEnabled()) {
-                    getMetrics().recordOperation("executeTransaction", System.nanoTime() - startTime);
+                    metrics.recordOperation("executeTransaction", System.nanoTime() - startTime);
                 }
 
                 return result;

@@ -1,5 +1,8 @@
 package it.mathsanalysis.load.metrics;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -9,7 +12,9 @@ import java.util.concurrent.atomic.LongAdder;
  * Enhanced performance metrics collection with resetStats method
  * Thread-safe with minimal overhead using atomic operations
  */
-public final class PerformanceMetrics {
+@Getter
+@Setter
+public class PerformanceMetrics {
 
     private final Map<String, LongAdder> operationCounts = new ConcurrentHashMap<>();
     private final Map<String, LongAdder> operationTimes = new ConcurrentHashMap<>();
@@ -103,5 +108,9 @@ public final class PerformanceMetrics {
         var totalOps = getTotalOperations();
         var uptimeMs = System.currentTimeMillis() - startTime.get();
         return uptimeMs > 0 ? (totalOps * 1000.0) / uptimeMs : 0.0;
+    }
+
+    public void reset() {
+        resetStats();
     }
 }

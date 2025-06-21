@@ -3,16 +3,17 @@ package it.mathsanalysis.load.core;
 import it.mathsanalysis.load.core.result.BatchResult;
 import it.mathsanalysis.load.core.result.DebugResult;
 import it.mathsanalysis.load.core.result.HealthStatus;
-import it.mathsanalysis.load.resilience.exception.DataLoaderException;
 import it.mathsanalysis.load.metrics.PerformanceMetrics;
+import it.mathsanalysis.load.resilience.event.structure.DataLoaderEventListener;
+import it.mathsanalysis.load.resilience.exception.DataLoaderException;
 import it.mathsanalysis.load.util.StreamCollector;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Abstract base implementation of DataLoader using Template Method pattern.
@@ -20,68 +21,72 @@ import java.util.concurrent.Flow;
  * Provides common functionality and algorithms while allowing subclasses
  * to customize specific database operations. This approach ensures consistency
  * across different database implementations while maintaining flexibility.
- *
- * Template Methods Implemented:
- * - Parameter validation and preprocessing
- * - Performance metrics collection
- * - Error handling and wrapping
- * - Async operation coordination
- * - Resource management
- *
- * Subclasses must implement:
- * - doSave: actual database save operation
- * - doSaveBatch: optimized batch save
- * - doFindById: single item retrieval
- * - doInitializeStorage: database structure creation
- * - doHealthCheck: database-specific health checks
- *
- * Thread Safety: This abstract class is thread-safe. Subclasses must ensure
- * their implementations are also thread-safe.
- *
- * @param <T> The type of items being loaded/saved
- * @param <ID> The type of item identifiers
+ * <p>
  */
 public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
 
+    // Core configuration
     protected final Class<T> itemType;
     protected final Class<ID> idType;
     protected final PerformanceMetrics metrics;
     protected final Map<String, Object> configuration;
 
+    // Plugin and event system
+    protected final List<DataLoaderEventListener> eventListeners;
+
+    // State management
+    protected final AtomicBoolean initialized = new AtomicBoolean(false);
+    protected final AtomicLong operationCounter = new AtomicLong(0);
+
     // Configuration constants
     private static final int DEFAULT_BATCH_SIZE = 1000;
     private static final long DEFAULT_TIMEOUT_MS = 30000;
     private static final boolean DEFAULT_ENABLE_METRICS = true;
+    private static final boolean DEFAULT_ENABLE_PLUGINS = true;
+    private static final boolean DEFAULT_ENABLE_EVENTS = true;
 
     /**
-     * Constructor for abstract data core
+     * Constructor for abstract data loader
      *
-     * @param itemType Class of items this core handles
+     * @param itemType Class of items this loader handles
      * @param idType Class of item identifiers
      * @param configuration Initial configuration map
      */
     protected AbstractDataLoader(Class<T> itemType, Class<ID> idType, Map<String, Object> configuration) {
         this.itemType = Objects.requireNonNull(itemType, "Item type cannot be null");
         this.idType = Objects.requireNonNull(idType, "ID type cannot be null");
-        this.configuration = Map.copyOf(Objects.requireNonNull(configuration, "Configuration cannot be null"));
+        this.configuration = new ConcurrentHashMap<>(Objects.requireNonNull(configuration, "Configuration cannot be null"));
         this.metrics = new PerformanceMetrics();
+        this.eventListeners = new ArrayList<>();
     }
+
+    /**
+     * Constructor with plugin and event support
+     *
+     * @param itemType Class of items this loader handles
+     * @param idType Class of item identifiers
+     * @param configuration Initial configuration map
+     * @param eventListeners List of event listeners to register
+     */
+    protected AbstractDataLoader(Class<T> itemType, Class<ID> idType, Map<String, Object> configuration, List<DataLoaderEventListener> eventListeners) {
+        this(itemType, idType, configuration);
+        if (eventListeners != null) {
+            this.eventListeners.addAll(eventListeners);
+        }
+    }
+
 
     @Override
     public final T save(T item, Map<String, Object> parameters) {
         // Template method implementation with common algorithm
 
-        // Step 1: Validate input
         validateSaveInput(item, parameters);
 
-        // Step 2: Record operation start
         var startTime = System.nanoTime();
 
         try {
-            // Step 3: Execute database-specific save (hook method)
             var savedItem = doSave(item, parameters);
 
-            // Step 4: Record success metrics
             if (isMetricsEnabled()) {
                 metrics.recordOperation("save", System.nanoTime() - startTime);
             }
@@ -89,7 +94,6 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
             return savedItem;
 
         } catch (Exception e) {
-            // Step 5: Handle errors consistently
             if (isMetricsEnabled()) {
                 metrics.recordOperation("save_error", System.nanoTime() - startTime);
             }
@@ -102,13 +106,13 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
         // Validate synchronously to fail fast
         validateSaveInput(item, parameters);
 
-        return CompletableFuture.supplyAsync(() -> save(item, parameters))
-            .whenComplete((result, throwable) -> {
-                if (throwable != null && isMetricsEnabled()) {
-                    metrics.recordOperation("save_async_error", 0);
-                }
-            });
+        return CompletableFuture.supplyAsync(() -> save(item, parameters)).whenComplete((result, throwable) -> {
+            if (throwable != null && isMetricsEnabled()) {
+                metrics.recordOperation("save_async_error", 0);
+            }
+        });
     }
+
 
     @Override
     public final List<T> saveBatch(List<T> items, Map<String, Object> parameters) {
@@ -164,9 +168,9 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
 
             // Return comprehensive batch result
             return new BatchResult<>(
-                savedItems,
-                collectedItems.size(),
-                collector.getErrors()
+                    savedItems,
+                    collectedItems.size(),
+                    collector.getErrors()
             );
         }).exceptionally(throwable -> {
             // Handle async batch errors
@@ -176,6 +180,7 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
             throw wrapException("Async batch save failed", "ASYNC_BATCH_ERROR", throwable, DataLoaderException.ErrorSeverity.CRITICAL);
         });
     }
+
 
     @Override
     public final Optional<T> findById(ID id) {
@@ -212,12 +217,11 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
 
     @Override
     public final CompletableFuture<Optional<T>> findByIdAsync(ID id) {
-        return CompletableFuture.supplyAsync(() -> findById(id))
-            .whenComplete((result, throwable) -> {
-                if (throwable != null && isMetricsEnabled()) {
-                    metrics.recordOperation("findByIdAsync_error", 0);
-                }
-            });
+        return CompletableFuture.supplyAsync(() -> findById(id)).whenComplete((result, throwable) -> {
+            if (throwable != null && isMetricsEnabled()) {
+                metrics.recordOperation("findByIdAsync_error", 0);
+            }
+        });
     }
 
     @Override
@@ -245,18 +249,20 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
 
     @Override
     public final DebugResult getDebugInfo() {
-        var loaderInfo = Map.of(
-            "itemType", itemType.getSimpleName(),
-            "idType", idType.getSimpleName(),
-            "implementation", this.getClass().getSimpleName(),
-            "configuration", getConfiguration()
-        );
+        var loaderInfo = new HashMap<String, Object>();
+        loaderInfo.put("itemType", itemType.getSimpleName());
+        loaderInfo.put("idType", idType.getSimpleName());
+        loaderInfo.put("implementation", this.getClass().getSimpleName());
+        loaderInfo.put("initialized", initialized.get());
+        loaderInfo.put("operationCount", operationCounter.get());
+        loaderInfo.put("eventListenerCount", eventListeners.size());
+        loaderInfo.put("configuration", getFilteredConfiguration());
 
         return new DebugResult(
-            this.getClass().getSimpleName(),
-            metrics.getStats(),
-            getConnectionStats(),
-            loaderInfo
+                this.getClass().getSimpleName(),
+                metrics.getStats(),
+                getConnectionStats(),
+                loaderInfo
         );
     }
 
@@ -264,48 +270,73 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
     public final CompletableFuture<HealthStatus> healthCheck() {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return doHealthCheck();
+                var baseHealth = doHealthCheck();
+
+                // Add framework-level health information
+                var enhancedMetrics = new HashMap<>(baseHealth.metrics());
+                enhancedMetrics.put("initialized", initialized.get());
+                enhancedMetrics.put("operationCount", operationCounter.get());
+                enhancedMetrics.put("eventListenerCount", eventListeners.size());
+
+                return new HealthStatus(
+                        baseHealth.isHealthy(),
+                        baseHealth.message(),
+                        enhancedMetrics
+                );
+
             } catch (Exception e) {
                 Map<String, Object> errorMetrics = Map.of(
-                    "error", e.getMessage(),
-                    "errorType", e.getClass().getSimpleName(),
-                    "timestamp", System.currentTimeMillis()
+                        "error", e.getMessage(),
+                        "errorType", e.getClass().getSimpleName(),
+                        "timestamp", System.currentTimeMillis(),
+                        "initialized", initialized.get()
                 );
                 return HealthStatus.unhealthy("Health check failed: " + e.getMessage(), errorMetrics);
             }
         });
     }
 
-    @Override
-    public final Map<String, Object> getConfiguration() {
-        return Map.copyOf(configuration);
+    /**
+     * Register an event listener with this data loader
+     */
+    public final void addEventListener(DataLoaderEventListener listener) {
+        Objects.requireNonNull(listener, "Event listener cannot be null");
+        if (!eventListeners.contains(listener)) {
+            eventListeners.add(listener);
+        }
     }
 
-    // Template methods - must be implemented by subclasses
+    /**
+     * Unregister an event listener from this data loader
+     */
+    public final void removeEventListener(DataLoaderEventListener listener) {
+        eventListeners.remove(listener);
+    }
+
 
     /**
-     * Database-specific save operation
+     * Database-specific save implementation
      *
-     * @param item Item to save
-     * @param parameters Save parameters
-     * @return Saved item with generated fields
+     * @param item The item to save
+     * @param parameters Operation parameters
+     * @return The saved item with any generated fields
      */
     protected abstract T doSave(T item, Map<String, Object> parameters);
 
     /**
-     * Database-specific batch save operation
+     * Database-specific batch save implementation
      *
-     * @param items Items to save
-     * @param parameters Batch parameters
-     * @return Saved items in same order
+     * @param items List of items to save
+     * @param parameters Batch operation parameters
+     * @return List of saved items in same order as input
      */
     protected abstract List<T> doSaveBatch(List<T> items, Map<String, Object> parameters);
 
     /**
-     * Database-specific find by ID operation
+     * Database-specific find by ID implementation
      *
-     * @param id Item identifier
-     * @return Optional containing found item
+     * @param id The item identifier
+     * @return Optional containing the item if found
      */
     protected abstract Optional<T> doFindById(ID id);
 
@@ -317,38 +348,62 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
     protected abstract void doInitializeStorage(Map<String, Object> parameters);
 
     /**
-     * Database-specific health check
+     * Database-specific health check implementation
      *
-     * @return Health status result
+     * @return Health status of the database connection
      */
     protected abstract HealthStatus doHealthCheck();
 
     /**
      * Get database connection statistics
      *
-     * @return Connection stats map
+     * @return Map of connection statistics
      */
     protected abstract Map<String, Object> getConnectionStats();
 
-    // Helper methods for subclasses
 
-    protected final Class<T> getItemType() { return itemType; }
-    protected final Class<ID> getIdType() { return idType; }
-    protected final PerformanceMetrics getMetrics() { return metrics; }
+    /**
+     * Get current configuration
+     */
+    public final Map<String, Object> getConfiguration() {
+        return Map.copyOf(configuration);
+    }
+
+    /**
+     * Update configuration (thread-safe)
+     */
+    protected final void updateConfiguration(String key, Object value) {
+        configuration.put(key, value);
+    }
+
+    /**
+     * Get configuration value with default
+     */
+    protected final <V> V getConfigurationValue(String key, V defaultValue) {
+        @SuppressWarnings("unchecked")
+        V value = (V) configuration.get(key);
+        return value != null ? value : defaultValue;
+    }
 
     protected final boolean isMetricsEnabled() {
-        return (Boolean) configuration.getOrDefault("enableMetrics", DEFAULT_ENABLE_METRICS);
+        return getConfigurationValue("enableMetrics", DEFAULT_ENABLE_METRICS);
+    }
+
+    protected final boolean isPluginsEnabled() {
+        return getConfigurationValue("enablePlugins", DEFAULT_ENABLE_PLUGINS);
+    }
+
+    protected final boolean isEventsEnabled() {
+        return getConfigurationValue("enableEvents", DEFAULT_ENABLE_EVENTS);
     }
 
     protected final int getBatchSize() {
-        return (Integer) configuration.getOrDefault("batchSize", DEFAULT_BATCH_SIZE);
+        return getConfigurationValue("batchSize", DEFAULT_BATCH_SIZE);
     }
 
     protected final long getTimeoutMs() {
-        return (Long) configuration.getOrDefault("timeoutMs", DEFAULT_TIMEOUT_MS);
+        return getConfigurationValue("timeoutMs", DEFAULT_TIMEOUT_MS);
     }
-
-    // Private helper methods
 
     private void validateSaveInput(T item, Map<String, Object> parameters) {
         Objects.requireNonNull(item, "Item to save cannot be null");
@@ -364,19 +419,40 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
     }
 
     private StreamCollector<T> createStreamCollector(Map<String, Object> parameters) {
-        var timeout = (Long) parameters.getOrDefault("streamTimeout", getTimeoutMs());
-        var maxItems = (Integer) parameters.getOrDefault("streamMaxItems", Integer.MAX_VALUE);
-        var collectErrors = (Boolean) parameters.getOrDefault("streamCollectErrors", true);
+        var timeout = getConfigurationValue("streamTimeout", getTimeoutMs());
+        var maxItems = getConfigurationValue("streamMaxItems", Integer.MAX_VALUE);
+        var collectErrors = getConfigurationValue("streamCollectErrors", true);
 
         return new StreamCollector<>(timeout, maxItems, collectErrors);
     }
 
     private DataLoaderException wrapException(String message, String errorCode, Throwable cause, DataLoaderException.ErrorSeverity severity) {
         Map<String, Object> context = Map.of(
-            "itemType", itemType.getSimpleName(),
-            "idType", idType.getSimpleName(),
-            "timestamp", System.currentTimeMillis()
+                "itemType", itemType.getSimpleName(),
+                "idType", idType.getSimpleName(),
+                "loaderType", this.getClass().getSimpleName(),
+                "operationCount", operationCounter.get(),
+                "timestamp", System.currentTimeMillis()
         );
         return new DataLoaderException(message, errorCode, severity, context, cause);
+    }
+
+    private Map<String, Object> getFilteredConfiguration() {
+        // Filter out sensitive information like passwords
+        return configuration.entrySet().stream()
+                .filter(entry -> !entry.getKey().toLowerCase().contains("password"))
+                .filter(entry -> !entry.getKey().toLowerCase().contains("secret"))
+                .filter(entry -> !entry.getKey().toLowerCase().contains("token"))
+                .collect(HashMap::new, (map, entry) -> map.put(entry.getKey(), entry.getValue()), HashMap::putAll);
+    }
+
+    /**
+     * Cleanup resources when the loader is no longer needed
+     */
+    public void shutdown() {
+        eventListeners.clear();
+
+        // Clear metrics
+        metrics.reset();
     }
 }

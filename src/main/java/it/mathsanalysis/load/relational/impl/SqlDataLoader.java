@@ -99,7 +99,7 @@ public final class SqlDataLoader<T, ID> extends RelationalDataLoader<T, ID> {
         }
         
         if (isMetricsEnabled()) {
-            getMetrics().recordOperation("executeCustomQuery", System.nanoTime() - startTime);
+            metrics.recordOperation("executeCustomQuery", System.nanoTime() - startTime);
         }
         
         return results;
@@ -125,7 +125,7 @@ public final class SqlDataLoader<T, ID> extends RelationalDataLoader<T, ID> {
                 var rowsAffected = statement.executeUpdate();
                 
                 if (isMetricsEnabled()) {
-                    getMetrics().recordOperation("executeUpdate", System.nanoTime() - startTime);
+                    metrics.recordOperation("executeUpdate", System.nanoTime() - startTime);
                 }
                 
                 return rowsAffected;
@@ -166,7 +166,7 @@ public final class SqlDataLoader<T, ID> extends RelationalDataLoader<T, ID> {
         }
         
         if (isMetricsEnabled()) {
-            getMetrics().recordOperation("executeStoredProcedure", System.nanoTime() - startTime);
+            metrics.recordOperation("executeStoredProcedure", System.nanoTime() - startTime);
         }
         
         return results;
@@ -269,7 +269,7 @@ public final class SqlDataLoader<T, ID> extends RelationalDataLoader<T, ID> {
             }
             
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("optimizeTable", System.nanoTime() - startTime);
+                metrics.recordOperation("optimizeTable", System.nanoTime() - startTime);
             }
             
             results.put("tableName", getTableName());
@@ -303,7 +303,7 @@ public final class SqlDataLoader<T, ID> extends RelationalDataLoader<T, ID> {
             }
             
             if (isMetricsEnabled()) {
-                getMetrics().recordOperation("createBackup", System.nanoTime() - startTime);
+                metrics.recordOperation("createBackup", System.nanoTime() - startTime);
             }
             
             results.put("backupPath", backupPath);

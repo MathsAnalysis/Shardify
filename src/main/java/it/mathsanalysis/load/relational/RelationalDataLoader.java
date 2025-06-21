@@ -296,7 +296,7 @@ public abstract class RelationalDataLoader<T, ID> extends AbstractDataLoader<T, 
         }
         
         if (isMetricsEnabled()) {
-            getMetrics().recordOperation("findByCriteria", System.nanoTime() - startTime);
+            metrics.recordOperation("findByCriteria", System.nanoTime() - startTime);
         }
         
         return results;
@@ -322,7 +322,7 @@ public abstract class RelationalDataLoader<T, ID> extends AbstractDataLoader<T, 
                         var count = resultSet.getLong(String.valueOf(1));
                         
                         if (isMetricsEnabled()) {
-                            getMetrics().recordOperation("countByCriteria", System.nanoTime() - startTime);
+                            metrics.recordOperation("countByCriteria", System.nanoTime() - startTime);
                         }
                         
                         return count;
@@ -355,7 +355,7 @@ public abstract class RelationalDataLoader<T, ID> extends AbstractDataLoader<T, 
                 var rowsAffected = statement.executeUpdate();
                 
                 if (isMetricsEnabled()) {
-                    getMetrics().recordOperation("update", System.nanoTime() - startTime);
+                    metrics.recordOperation("update", System.nanoTime() - startTime);
                 }
                 
                 if (rowsAffected > 0) {
@@ -392,7 +392,7 @@ public abstract class RelationalDataLoader<T, ID> extends AbstractDataLoader<T, 
                 var rowsAffected = statement.executeUpdate();
                 
                 if (isMetricsEnabled()) {
-                    getMetrics().recordOperation("deleteById", System.nanoTime() - startTime);
+                    metrics.recordOperation("deleteById", System.nanoTime() - startTime);
                 }
                 
                 return rowsAffected > 0;

@@ -94,7 +94,7 @@ public final class DataLoaderConfiguration {
             .build();
     }
     
-    private static DataLoaderConfiguration productionConfig() {
+    public static DataLoaderConfiguration productionConfig() {
         return builder()
             .connection(ConnectionConfig.builder()
                 .maxPoolSize(100)
@@ -173,7 +173,7 @@ public final class DataLoaderConfiguration {
         private MetricsConfig metrics = MetricsConfig.defaults();
         private SecurityConfig security = SecurityConfig.defaults();
         private ResilienceConfig resilience = ResilienceConfig.defaults();
-        private Map<String, EnvironmentConfig> environments = new HashMap<>();
+        private final Map<String, EnvironmentConfig> environments = new HashMap<>();
         
         public Builder connection(ConnectionConfig connection) {
             this.connection = connection;
