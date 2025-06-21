@@ -62,7 +62,7 @@ public final class CachedDataLoaderFactory {
     }
 
     /**
-     * Controlla se loader ha bisogno di caching
+     * Controlla se core ha bisogno di caching
      */
     public static boolean needsCaching(Class<?> itemType) {
         // Logica per determinare se un tipo necessita di caching

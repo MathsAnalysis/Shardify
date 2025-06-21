@@ -45,9 +45,9 @@ import java.util.Map;
 public final class SqlDataLoader<T, ID> extends RelationalDataLoader<T, ID> {
 
     /**
-     * Create SQL data loader
+     * Create SQL data core
      * 
-     * @param itemType Class of items this loader handles
+     * @param itemType Class of items this core handles
      * @param idType Class of item identifiers
      * @param connectionProvider SQL connection provider (HikariCP recommended)
      * @param queryBuilder SQL query builder with dialect support

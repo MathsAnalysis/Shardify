@@ -42,9 +42,9 @@ public abstract class DocumentDataLoader<T, ID> extends AbstractDataLoader<T, ID
     protected final String databaseName;
 
     /**
-     * Constructor for document data loader
+     * Constructor for document data core
      *
-     * @param itemType Class of items this loader handles
+     * @param itemType Class of items this core handles
      * @param idType Class of item identifiers
      * @param connectionProvider Document database connection provider
      * @param serializer Document serializer for object conversion

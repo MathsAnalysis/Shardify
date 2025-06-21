@@ -303,7 +303,7 @@ public final class CachedDataLoaderWrapper<T, ID> implements DataLoader<T, ID> {
     }
 
     /**
-     * Ottieni delegate loader
+     * Ottieni delegate core
      */
     public DataLoader<T, ID> getDelegate() {
         return delegate;

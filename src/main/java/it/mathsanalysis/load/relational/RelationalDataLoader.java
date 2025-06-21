@@ -46,9 +46,9 @@ public abstract class RelationalDataLoader<T, ID> extends AbstractDataLoader<T, 
     protected final String tableName;
 
     /**
-     * Constructor for relational data loader
+     * Constructor for relational data core
      * 
-     * @param itemType Class of items this loader handles
+     * @param itemType Class of items this core handles
      * @param idType Class of item identifiers  
      * @param connectionProvider Database connection provider
      * @param queryBuilder SQL query builder

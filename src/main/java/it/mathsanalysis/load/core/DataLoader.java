@@ -3,6 +3,7 @@ package it.mathsanalysis.load.core;
 import it.mathsanalysis.load.core.result.BatchResult;
 import it.mathsanalysis.load.core.result.DebugResult;
 import it.mathsanalysis.load.core.result.HealthStatus;
+import lombok.Getter;
 
 import java.util.List;
 import java.util.Map;
@@ -154,7 +155,7 @@ public interface DataLoader<T, ID> {
     /**
      * Get comprehensive debug information
      *
-     * Provides detailed insights into loader performance and state:
+     * Provides detailed insights into core performance and state:
      * - Operation statistics (count, average time, throughput)
      * - Connection pool status and health
      * - Query cache hit rates and statistics
@@ -183,7 +184,7 @@ public interface DataLoader<T, ID> {
     CompletableFuture<HealthStatus> healthCheck();
 
     /**
-     * Gracefully shutdown the loader and release resources
+     * Gracefully shutdown the core and release resources
      *
      * Ensures clean shutdown with proper resource cleanup:
      * - Completes in-flight operations
@@ -199,7 +200,7 @@ public interface DataLoader<T, ID> {
     }
 
     /**
-     * Get loader configuration information
+     * Get core configuration information
      *
      * Returns current configuration settings for inspection and debugging.
      * Useful for configuration validation and troubleshooting.
@@ -228,35 +229,4 @@ public interface DataLoader<T, ID> {
         return false; // Default: configuration updates not supported
     }
 
-    /**
-     * Exception thrown by DataLoader operations
-     *
-     * Wraps underlying database exceptions with additional context and
-     * standardized error codes for consistent error handling.
-     */
-    class DataLoaderException extends RuntimeException {
-        private final String errorCode;
-        private final Map<String, Object> context;
-
-        public DataLoaderException(String message, String errorCode) {
-            super(message);
-            this.errorCode = errorCode;
-            this.context = Map.of();
-        }
-
-        public DataLoaderException(String message, String errorCode, Throwable cause) {
-            super(message, cause);
-            this.errorCode = errorCode;
-            this.context = Map.of();
-        }
-
-        public DataLoaderException(String message, String errorCode, Map<String, Object> context, Throwable cause) {
-            super(message, cause);
-            this.errorCode = errorCode;
-            this.context = Map.copyOf(context);
-        }
-
-        public String getErrorCode() { return errorCode; }
-        public Map<String, Object> getContext() { return context; }
-    }
 }

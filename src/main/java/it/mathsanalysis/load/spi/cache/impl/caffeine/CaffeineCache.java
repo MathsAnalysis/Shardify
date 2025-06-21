@@ -36,7 +36,7 @@ public final class CaffeineCache<K, V> implements Cache<K, V> {
 
         var builder = buildCaffeine(configuration);
 
-        // Create loading cache with default loader
+        // Create loading cache with default core
         this.syncCache = builder.build(key -> null);
 
         // Setup removal listener for events

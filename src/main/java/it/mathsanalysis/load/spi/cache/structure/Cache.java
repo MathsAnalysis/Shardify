@@ -26,7 +26,7 @@ public interface Cache<K, V> {
     Optional<V> get(K key);
 
     /**
-     * Get value by key with loader function if not present
+     * Get value by key with core function if not present
      *
      * @param key    Cache key
      * @param loader Function to load value if not in cache

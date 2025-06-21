@@ -45,7 +45,7 @@ implementation("it.mathsanalysis:shardify-load:1.0.0")
 // Define your entity
 public record User(Long id, String username, String email, LocalDateTime createdAt) {}
 
-// Create a high-performance data loader
+// Create a high-performance data core
 var loader = LoaderBuilder.forType(User.class, Long.class)
     .withSqlConnection("jdbc:postgresql://localhost:5432/mydb", "user", "password")
     .withTable("users")
@@ -89,7 +89,7 @@ public record Product(
     Map<String, Object> metadata
 ) {}
 
-// Create MongoDB loader
+// Create MongoDB core
 var mongoLoader = LoaderBuilder.forType(Product.class, String.class)
     .withMongoConnection("mongodb://localhost:27017", "ecommerce")
     .withCollection("products")

@@ -3,6 +3,7 @@ package it.mathsanalysis.load.core;
 import it.mathsanalysis.load.core.result.BatchResult;
 import it.mathsanalysis.load.core.result.DebugResult;
 import it.mathsanalysis.load.core.result.HealthStatus;
+import it.mathsanalysis.load.resilience.exception.DataLoaderException;
 import it.mathsanalysis.load.metrics.PerformanceMetrics;
 import it.mathsanalysis.load.util.StreamCollector;
 
@@ -53,9 +54,9 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
     private static final boolean DEFAULT_ENABLE_METRICS = true;
 
     /**
-     * Constructor for abstract data loader
+     * Constructor for abstract data core
      *
-     * @param itemType Class of items this loader handles
+     * @param itemType Class of items this core handles
      * @param idType Class of item identifiers
      * @param configuration Initial configuration map
      */
@@ -92,7 +93,7 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
             if (isMetricsEnabled()) {
                 metrics.recordOperation("save_error", System.nanoTime() - startTime);
             }
-            throw wrapException("Save operation failed", "SAVE_ERROR", e);
+            throw wrapException("Save operation failed", "SAVE_ERROR", e, DataLoaderException.ErrorSeverity.CRITICAL);
         }
     }
 
@@ -140,7 +141,7 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
             if (isMetricsEnabled()) {
                 metrics.recordOperation("saveBatch_error", System.nanoTime() - startTime);
             }
-            throw wrapException("Batch save operation failed", "BATCH_SAVE_ERROR", e);
+            throw wrapException("Batch save operation failed", "BATCH_SAVE_ERROR", e, DataLoaderException.ErrorSeverity.CRITICAL);
         }
     }
 
@@ -172,7 +173,7 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
             if (isMetricsEnabled()) {
                 metrics.recordOperation("saveBatchAsync_error", 0);
             }
-            throw wrapException("Async batch save failed", "ASYNC_BATCH_ERROR", throwable);
+            throw wrapException("Async batch save failed", "ASYNC_BATCH_ERROR", throwable, DataLoaderException.ErrorSeverity.CRITICAL);
         });
     }
 
@@ -205,7 +206,7 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
             if (isMetricsEnabled()) {
                 metrics.recordOperation("findById_error", System.nanoTime() - startTime);
             }
-            throw wrapException("Find by ID operation failed", "FIND_ERROR", e);
+            throw wrapException("Find by ID operation failed", "FIND_ERROR", e, DataLoaderException.ErrorSeverity.CRITICAL);
         }
     }
 
@@ -237,7 +238,7 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
                 if (isMetricsEnabled()) {
                     metrics.recordOperation("initializeStorage_error", System.nanoTime() - startTime);
                 }
-                throw wrapException("Storage initialization failed", "INIT_ERROR", e);
+                throw wrapException("Storage initialization failed", "INIT_ERROR", e, DataLoaderException.ErrorSeverity.CRITICAL);
             }
         });
     }
@@ -370,12 +371,12 @@ public abstract class AbstractDataLoader<T, ID> implements DataLoader<T, ID> {
         return new StreamCollector<>(timeout, maxItems, collectErrors);
     }
 
-    private DataLoaderException wrapException(String message, String errorCode, Throwable cause) {
+    private DataLoaderException wrapException(String message, String errorCode, Throwable cause, DataLoaderException.ErrorSeverity severity) {
         Map<String, Object> context = Map.of(
             "itemType", itemType.getSimpleName(),
             "idType", idType.getSimpleName(),
             "timestamp", System.currentTimeMillis()
         );
-        return new DataLoaderException(message, errorCode, context, cause);
+        return new DataLoaderException(message, errorCode, severity, context, cause);
     }
 }

@@ -39,9 +39,9 @@ import java.util.Map;
 public final class MongoDataLoader<T, ID> extends DocumentDataLoader<T, ID> {
 
     /**
-     * Create MongoDB data loader
+     * Create MongoDB data core
      * 
-     * @param itemType Class of items this loader handles
+     * @param itemType Class of items this core handles
      * @param idType Class of item identifiers
      * @param connectionProvider MongoDB connection provider
      * @param serializer Document serializer for BSON conversion

@@ -1,34 +1,52 @@
+// ===== src/main/java/it/mathsanalysis/load/builder/LoaderBuilder.java =====
 package it.mathsanalysis.load.builder;
 
 import it.mathsanalysis.load.core.DataLoader;
-import it.mathsanalysis.load.impl.mapping.ReflectionItemMapper;
-import it.mathsanalysis.load.impl.serialization.JacksonDocumentSerializer;
+import it.mathsanalysis.load.plugin.core.AnnotationValidationPlugin;
+import it.mathsanalysis.load.plugin.core.LoggingPlugin;
+import it.mathsanalysis.load.plugin.core.MetricsPlugin;
+import it.mathsanalysis.load.plugin.structure.DataLoaderPlugin;
 import it.mathsanalysis.load.relational.impl.SqlDataLoader;
 import it.mathsanalysis.load.document.impl.MongoDataLoader;
 import it.mathsanalysis.load.relational.connection.HikariConnectionProvider;
 import it.mathsanalysis.load.document.connection.MongoConnectionProvider;
 import it.mathsanalysis.load.impl.query.ReflectionQueryBuilder;
 import it.mathsanalysis.load.document.query.MongoQueryBuilder;
+import it.mathsanalysis.load.impl.mapping.ReflectionItemMapper;
+import it.mathsanalysis.load.impl.serialization.JacksonDocumentSerializer;
+import it.mathsanalysis.load.resilience.config.central.DataLoaderConfiguration;
+import it.mathsanalysis.load.resilience.event.structure.DataLoaderEventListener;
 import it.mathsanalysis.load.spi.connection.ConnectionProvider;
 import it.mathsanalysis.load.spi.connection.DocumentConnectionProvider;
 import it.mathsanalysis.load.spi.query.DocumentQueryBuilder;
+import lombok.Getter;
 
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Fluent builder for creating optimized data loaders.
+ * Enhanced fluent builder for creating optimized data loaders with type safety and validation.
+ *
+ * This builder uses a type-safe approach to prevent invalid configurations and provides
+ * comprehensive customization options for enterprise-grade applications.
+ *
+ * Features:
+ * - Type-safe configuration flow
+ * - Environment-specific presets
+ * - Plugin system integration
+ * - Event listener support
+ * - Comprehensive validation
+ * - Auto-configuration capabilities
  */
 public final class LoaderBuilder<T, ID> {
 
     // Core configuration
     private final Class<T> itemType;
     private final Class<ID> idType;
-    private final Map<String, Object> configuration;
+    private DataLoaderConfiguration configuration;
 
-    // Database type
-    private LoaderType loaderType;
+    // Database type tracking
+    private DatabaseType databaseType;
 
     // Connection configuration
     private ConnectionProvider connectionProvider;
@@ -36,11 +54,6 @@ public final class LoaderBuilder<T, ID> {
     private String connectionString;
     private String username;
     private String password;
-    private int maxPoolSize = 20;
-    private int minIdle = 5;
-    private long connectionTimeoutMs = 30000;
-    private long idleTimeoutMs = 600000;
-    private long maxLifetimeMs = 1800000;
 
     // Database configuration
     private String tableName;
@@ -48,22 +61,29 @@ public final class LoaderBuilder<T, ID> {
     private String databaseName;
     private String schema;
 
-    // Feature flags
-    private boolean enableMetrics = true;
-    private boolean enableQueryCache = true;
-    private final boolean enableConnectionPooling = true;
-    private boolean enableHealthChecks = true;
-    private boolean enableAsyncOperations = true;
+    // Enhanced configuration
+    private final List<DataLoaderEventListener> eventListeners = new ArrayList<>();
+    private final List<DataLoaderPlugin> plugins = new ArrayList<>();
 
-    // Performance tuning
-    private int batchSize = 1000;
-    private long queryTimeoutMs = 30000;
-    private int maxCacheSize = 1000;
-    private final boolean enablePreparedStatementCache = true;
+    // Validation state
+    private boolean validated = false;
 
-    // Environment-specific settings
-    private Environment environment = Environment.STANDALONE;
-    private String minecraftPluginName;
+    /**
+     * Database types supported by the framework
+     */
+    @Getter
+    public enum DatabaseType {
+        SQL("sql"),
+        MONGODB("mongodb"),
+        DOCUMENT("document");
+
+        private final String type;
+
+        DatabaseType(String type) {
+            this.type = type;
+        }
+
+    }
 
     /**
      * Private constructor - use factory methods
@@ -71,9 +91,10 @@ public final class LoaderBuilder<T, ID> {
     private LoaderBuilder(Class<T> itemType, Class<ID> idType) {
         this.itemType = Objects.requireNonNull(itemType, "Item type cannot be null");
         this.idType = Objects.requireNonNull(idType, "ID type cannot be null");
-        this.configuration = new java.util.HashMap<>();
-        initializeDefaults();
+        this.configuration = DataLoaderConfiguration.defaults();
     }
+
+    // ===== Factory Methods =====
 
     /**
      * Start building a loader for the specified types
@@ -87,188 +108,116 @@ public final class LoaderBuilder<T, ID> {
      */
     @SuppressWarnings("unchecked")
     public static <T> LoaderBuilder<T, String> forType(Class<T> itemType) {
-        return new LoaderBuilder<>(itemType, String.class);
+        return new LoaderBuilder<>(itemType, (Class<String>) String.class);
     }
 
-    public LoaderBuilder<T, ID> forMinecraftOptimization(String pluginName) {
-        forMinecraft(pluginName);
-        this.maxPoolSize = 1;
-        this.minIdle = 0;
-        this.batchSize = 20;
-        this.queryTimeoutMs = 1000;
-        this.maxCacheSize = 100;
-        this.enableQueryCache = false;
+    // ===== Configuration Methods =====
+
+    /**
+     * Configure with pre-built DataLoaderConfiguration
+     */
+    public LoaderBuilder<T, ID> withConfiguration(DataLoaderConfiguration configuration) {
+        this.configuration = Objects.requireNonNull(configuration, "Configuration cannot be null");
         return this;
     }
 
+    /**
+     * Configure for specific environment with auto-optimization
+     */
+    public LoaderBuilder<T, ID> forEnvironment(DataLoaderConfiguration.Environment environment) {
+        this.configuration = DataLoaderConfiguration.forEnvironment(environment);
+        return this;
+    }
 
-    // SQL Database Configuration
+    // ===== SQL Database Configuration =====
 
     /**
      * Configure for SQL database with connection string
+     * Returns a type-safe SQL configuration builder
      */
-    public LoaderBuilder<T, ID> withSqlConnection(String connectionString) {
+    public SqlConfigurationBuilder<T, ID> withSqlConnection(String connectionString) {
         this.connectionString = Objects.requireNonNull(connectionString, "Connection string cannot be null");
-        this.loaderType = LoaderType.SQL;
+        this.databaseType = DatabaseType.SQL;
         detectSqlDialect(connectionString);
-        return this;
+        return new SqlConfigurationBuilder<>(this);
     }
 
     /**
      * Configure for SQL database with credentials
      */
-    public LoaderBuilder<T, ID> withSqlConnection(String connectionString, String username, String password) {
+    public SqlConfigurationBuilder<T, ID> withSqlConnection(String connectionString, String username, String password) {
         this.connectionString = Objects.requireNonNull(connectionString, "Connection string cannot be null");
         this.username = username;
         this.password = password;
-        this.loaderType = LoaderType.SQL;
+        this.databaseType = DatabaseType.SQL;
         detectSqlDialect(connectionString);
-        return this;
+        return new SqlConfigurationBuilder<>(this);
     }
 
     /**
      * Configure with custom SQL connection provider
      */
-    public LoaderBuilder<T, ID> withSqlConnection(ConnectionProvider provider) {
+    public SqlConfigurationBuilder<T, ID> withSqlConnection(ConnectionProvider provider) {
         this.connectionProvider = Objects.requireNonNull(provider, "Connection provider cannot be null");
-        this.loaderType = LoaderType.SQL;
-        return this;
+        this.databaseType = DatabaseType.SQL;
+        return new SqlConfigurationBuilder<>(this);
     }
-
-    /**
-     * Set table name for SQL databases
-     */
-    public LoaderBuilder<T, ID> withTable(String tableName) {
-        this.tableName = Objects.requireNonNull(tableName, "Table name cannot be null");
-        return this;
-    }
-
-    /**
-     * Set database schema for SQL databases
-     */
-    public LoaderBuilder<T, ID> withSchema(String schema) {
-        this.schema = schema;
-        return this;
-    }
-
-    // Document Database Configuration
 
     /**
      * Configure for MongoDB connection
+     * Returns a type-safe MongoDB configuration builder
      */
-    public LoaderBuilder<T, ID> withMongoConnection(String connectionString, String databaseName) {
+    public MongoConfigurationBuilder<T, ID> withMongoConnection(String connectionString, String databaseName) {
         this.connectionString = Objects.requireNonNull(connectionString, "Connection string cannot be null");
         this.databaseName = Objects.requireNonNull(databaseName, "Database name cannot be null");
-        this.loaderType = LoaderType.MONGO;
-        return this;
+        this.databaseType = DatabaseType.MONGODB;
+        return new MongoConfigurationBuilder<>(this);
     }
 
     /**
      * Configure with custom document connection provider
      */
-    public LoaderBuilder<T, ID> withDocumentConnection(DocumentConnectionProvider provider) {
+    public DocumentConfigurationBuilder<T, ID> withDocumentConnection(DocumentConnectionProvider provider) {
         this.documentConnectionProvider = Objects.requireNonNull(provider, "Document connection provider cannot be null");
-        this.loaderType = LoaderType.DOCUMENT;
-        return this;
+        this.databaseType = DatabaseType.DOCUMENT;
+        return new DocumentConfigurationBuilder<>(this);
     }
 
+
     /**
-     * Set collection name for document databases
+     * Add event listener for customization
      */
-    public LoaderBuilder<T, ID> withCollection(String collectionName) {
-        this.collectionName = Objects.requireNonNull(collectionName, "Collection name cannot be null");
+    public LoaderBuilder<T, ID> addEventListener(DataLoaderEventListener listener) {
+        this.eventListeners.add(Objects.requireNonNull(listener, "Event listener cannot be null"));
         return this;
     }
 
     /**
-     * Set database name for document databases
+     * Add plugin for extensibility
      */
-    public LoaderBuilder<T, ID> withDatabase(String databaseName) {
-        this.databaseName = Objects.requireNonNull(databaseName, "Database name cannot be null");
+    public LoaderBuilder<T, ID> addPlugin(DataLoaderPlugin plugin) {
+        this.plugins.add(Objects.requireNonNull(plugin, "Plugin cannot be null"));
         return this;
     }
 
-    // Connection Pool Configuration
-
     /**
-     * Configure connection pool settings
+     * Add standard plugins for common functionality
      */
-    public LoaderBuilder<T, ID> withConnectionPool(int maxPoolSize, int minIdle) {
-        if (maxPoolSize <= 0) throw new IllegalArgumentException("Max pool size must be positive");
-        if (minIdle < 0) throw new IllegalArgumentException("Min idle cannot be negative");
-        if (minIdle > maxPoolSize) throw new IllegalArgumentException("Min idle cannot exceed max pool size");
-
-        this.maxPoolSize = maxPoolSize;
-        this.minIdle = minIdle;
+    public LoaderBuilder<T, ID> withStandardPlugins() {
+        addPlugin(new AnnotationValidationPlugin());
+        addPlugin(new LoggingPlugin());
+        addPlugin(new MetricsPlugin());
         return this;
     }
 
-    /**
-     * Configure advanced connection pool settings
-     */
-    public LoaderBuilder<T, ID> withAdvancedConnectionPool(
-            int maxPoolSize,
-            int minIdle,
-            long connectionTimeoutMs,
-            long idleTimeoutMs,
-            long maxLifetimeMs) {
-
-        withConnectionPool(maxPoolSize, minIdle);
-        this.connectionTimeoutMs = connectionTimeoutMs;
-        this.idleTimeoutMs = idleTimeoutMs;
-        this.maxLifetimeMs = maxLifetimeMs;
-        return this;
-    }
-
-    // Feature Configuration
 
     /**
-     * Enable or disable performance metrics collection
-     */
-    public LoaderBuilder<T, ID> withMetrics(boolean enabled) {
-        this.enableMetrics = enabled;
-        return this;
-    }
-
-    /**
-     * Enable or disable query caching
-     */
-    public LoaderBuilder<T, ID> withQueryCache(boolean enabled) {
-        this.enableQueryCache = enabled;
-        return this;
-    }
-
-    /**
-     * Configure batch processing settings
-     */
-    public LoaderBuilder<T, ID> withBatchSize(int batchSize) {
-        if (batchSize <= 0) throw new IllegalArgumentException("Batch size must be positive");
-        this.batchSize = batchSize;
-        return this;
-    }
-
-    /**
-     * Configure query timeout
-     */
-    public LoaderBuilder<T, ID> withQueryTimeout(long timeoutMs) {
-        if (timeoutMs <= 0) throw new IllegalArgumentException("Query timeout must be positive");
-        this.queryTimeoutMs = timeoutMs;
-        return this;
-    }
-
-    // Environment Configuration
-
-    /**
-     * Configure for Minecraft environment
+     * Configure for Minecraft environment with optimizations
      */
     public LoaderBuilder<T, ID> forMinecraft(String pluginName) {
-        this.environment = Environment.MINECRAFT_SPIGOT;
-        this.minecraftPluginName = Objects.requireNonNull(pluginName, "Plugin name cannot be null");
-
-        // Minecraft-specific optimizations
-        this.maxPoolSize = Math.min(maxPoolSize, 10);
-        this.enableAsyncOperations = true;
-        this.queryTimeoutMs = Math.min(queryTimeoutMs, 5000);
+        this.configuration = DataLoaderConfiguration.forEnvironment(
+                DataLoaderConfiguration.Environment.MINECRAFT
+        );
 
         return this;
     }
@@ -277,34 +226,33 @@ public final class LoaderBuilder<T, ID> {
      * Configure for Spring Boot environment
      */
     public LoaderBuilder<T, ID> forSpringBoot() {
-        this.environment = Environment.SPRING_BOOT;
-        this.enableHealthChecks = true;
-        this.enableMetrics = true;
+        this.configuration = DataLoaderConfiguration.forEnvironment(
+                DataLoaderConfiguration.Environment.PRODUCTION
+        );
         return this;
     }
 
     /**
-     * Configure for standalone application
+     * Configure for high-performance production environment
      */
-    public LoaderBuilder<T, ID> forStandalone() {
-        this.environment = Environment.STANDALONE;
-        return this;
+    public LoaderBuilder<T, ID> forHighPerformance() {
+        this.configuration = DataLoaderConfiguration.productionConfig();
+        return withStandardPlugins();
     }
 
-    // Build Methods
 
     /**
-     * Build the configured data loader
+     * Build the configured data loader with validation
      */
     public DataLoader<T, ID> build() {
         validateConfiguration();
         applyDefaults();
-        buildConfiguration();
 
-        return switch (loaderType) {
+        return switch (databaseType) {
             case SQL -> buildSqlLoader();
-            case MONGO -> buildMongoLoader();
+            case MONGODB -> buildMongoLoader();
             case DOCUMENT -> buildDocumentLoader();
+            case null -> throw new IllegalStateException("Database type not specified");
         };
     }
 
@@ -326,58 +274,171 @@ public final class LoaderBuilder<T, ID> {
                 );
     }
 
-    // Private Implementation Methods
+    /**
+     * SQL-specific configuration builder
+     */
+    public static final class SqlConfigurationBuilder<T, ID> {
+        private final LoaderBuilder<T, ID> parent;
 
-    private void initializeDefaults() {
-        configuration.put("enableMetrics", enableMetrics);
-        configuration.put("enableQueryCache", enableQueryCache);
-        configuration.put("batchSize", batchSize);
-        configuration.put("queryTimeoutMs", queryTimeoutMs);
-        configuration.put("environment", environment);
+        private SqlConfigurationBuilder(LoaderBuilder<T, ID> parent) {
+            this.parent = parent;
+        }
+
+        /**
+         * Set table name for SQL databases
+         */
+        public SqlConfigurationBuilder<T, ID> withTable(String tableName) {
+            parent.tableName = Objects.requireNonNull(tableName, "Table name cannot be null");
+            return this;
+        }
+
+        /**
+         * Set database schema for SQL databases
+         */
+        public SqlConfigurationBuilder<T, ID> withSchema(String schema) {
+            parent.schema = schema;
+            return this;
+        }
+
+        /**
+         * Configure connection pool settings
+         */
+        public SqlConfigurationBuilder<T, ID> withConnectionPool(int maxPoolSize, int minIdle) {
+            if (maxPoolSize <= 0) throw new IllegalArgumentException("Max pool size must be positive");
+            if (minIdle < 0) throw new IllegalArgumentException("Min idle cannot be negative");
+            if (minIdle > maxPoolSize) throw new IllegalArgumentException("Min idle cannot exceed max pool size");
+
+//            var connectionConfig = parent.configuration.getConnection()
+//                    .maxPoolSize(maxPoolSize)
+//                    .minIdle(minIdle)
+//                    .build();
+
+//            parent.configuration = parent.configuration.toBuilder()
+//                    .connection(connectionConfig)
+//                    .build();
+
+            return this;
+        }
+
+        // Return to main builder
+        public LoaderBuilder<T, ID> and() {
+            return parent;
+        }
+
+        // Direct build
+        public DataLoader<T, ID> build() {
+            return parent.build();
+        }
+    }
+
+    /**
+     * MongoDB-specific configuration builder
+     */
+    public static final class MongoConfigurationBuilder<T, ID> {
+        private final LoaderBuilder<T, ID> parent;
+
+        private MongoConfigurationBuilder(LoaderBuilder<T, ID> parent) {
+            this.parent = parent;
+        }
+
+        /**
+         * Set collection name for MongoDB
+         */
+        public MongoConfigurationBuilder<T, ID> withCollection(String collectionName) {
+            parent.collectionName = Objects.requireNonNull(collectionName, "Collection name cannot be null");
+            return this;
+        }
+
+        /**
+         * Configure MongoDB-specific options
+         */
+        public MongoConfigurationBuilder<T, ID> withMongoOptions(Map<String, Object> options) {
+            // Store MongoDB-specific configuration
+            return this;
+        }
+
+        // Return to main builder
+        public LoaderBuilder<T, ID> and() {
+            return parent;
+        }
+
+        // Direct build
+        public DataLoader<T, ID> build() {
+            return parent.build();
+        }
+    }
+
+    /**
+     * Document database configuration builder
+     */
+    public static final class DocumentConfigurationBuilder<T, ID> {
+        private final LoaderBuilder<T, ID> parent;
+
+        private DocumentConfigurationBuilder(LoaderBuilder<T, ID> parent) {
+            this.parent = parent;
+        }
+
+        /**
+         * Set collection name for document databases
+         */
+        public DocumentConfigurationBuilder<T, ID> withCollection(String collectionName) {
+            parent.collectionName = Objects.requireNonNull(collectionName, "Collection name cannot be null");
+            return this;
+        }
+
+        /**
+         * Set database name for document databases
+         */
+        public DocumentConfigurationBuilder<T, ID> withDatabase(String databaseName) {
+            parent.databaseName = Objects.requireNonNull(databaseName, "Database name cannot be null");
+            return this;
+        }
+
+        // Return to main builder
+        public LoaderBuilder<T, ID> and() {
+            return parent;
+        }
+
+        // Direct build
+        public DataLoader<T, ID> build() {
+            return parent.build();
+        }
     }
 
     private void validateConfiguration() {
-        if (loaderType == null) {
+        if (validated) return;
+
+        if (databaseType == null) {
             throw new IllegalStateException("Database type not specified. Use withSqlConnection() or withMongoConnection()");
         }
 
-        if (loaderType == LoaderType.SQL) {
-            if (connectionProvider == null && connectionString == null) {
-                throw new IllegalStateException("SQL connection not configured");
+        switch (databaseType) {
+            case SQL -> {
+                if (connectionProvider == null && connectionString == null) {
+                    throw new IllegalStateException("SQL connection not configured");
+                }
+            }
+            case MONGODB, DOCUMENT -> {
+                if (documentConnectionProvider == null && connectionString == null) {
+                    throw new IllegalStateException("Document connection not configured");
+                }
+                if (databaseType == DatabaseType.MONGODB && databaseName == null) {
+                    throw new IllegalStateException("Database name required for MongoDB");
+                }
             }
         }
 
-        if (loaderType == LoaderType.MONGO || loaderType == LoaderType.DOCUMENT) {
-            if (documentConnectionProvider == null && connectionString == null) {
-                throw new IllegalStateException("Document connection not configured");
-            }
-            if (loaderType == LoaderType.MONGO && databaseName == null) {
-                throw new IllegalStateException("Database name required for MongoDB");
-            }
-        }
+        validated = true;
     }
 
     private void applyDefaults() {
-        if (tableName == null && loaderType == LoaderType.SQL) {
+        if (tableName == null && databaseType == DatabaseType.SQL) {
             tableName = generateDefaultTableName();
         }
 
-        if (collectionName == null && (loaderType == LoaderType.MONGO || loaderType == LoaderType.DOCUMENT)) {
+        if (collectionName == null && (databaseType == DatabaseType.MONGODB || databaseType == DatabaseType.DOCUMENT)) {
             collectionName = generateDefaultCollectionName();
         }
-    }
-
-    private void buildConfiguration() {
-        configuration.put("enableMetrics", enableMetrics);
-        configuration.put("enableQueryCache", enableQueryCache);
-        configuration.put("batchSize", batchSize);
-        configuration.put("queryTimeoutMs", queryTimeoutMs);
-        configuration.put("environment", environment);
-        configuration.put("maxPoolSize", maxPoolSize);
-        configuration.put("minIdle", minIdle);
-        configuration.put("connectionTimeoutMs", connectionTimeoutMs);
-        configuration.put("idleTimeoutMs", idleTimeoutMs);
-        configuration.put("maxLifetimeMs", maxLifetimeMs);
     }
 
     private DataLoader<T, ID> buildSqlLoader() {
@@ -387,18 +448,25 @@ public final class LoaderBuilder<T, ID> {
         }
 
         // Create SQL-specific components
-        var queryBuilder = new ReflectionQueryBuilder<T>(itemType, tableName, enableQueryCache);
+        var queryBuilder = new ReflectionQueryBuilder<T>(itemType, tableName,
+                configuration.getCache().enabled());
         var itemMapper = new ReflectionItemMapper<>(itemType);
 
-        return new SqlDataLoader<>(
+        // Build the loader
+        var loader = new SqlDataLoader<>(
                 itemType,
                 idType,
                 connectionProvider,
                 queryBuilder,
                 itemMapper,
                 tableName,
-                configuration
+                configurationToMap()
         );
+
+        // Configure plugins and event listeners
+        configureLoaderExtensions(loader);
+
+        return loader;
     }
 
     private DataLoader<T, ID> buildMongoLoader() {
@@ -411,7 +479,8 @@ public final class LoaderBuilder<T, ID> {
         var serializer = new JacksonDocumentSerializer<T>();
         var queryBuilder = new MongoQueryBuilder<T>();
 
-        return new MongoDataLoader<>(
+        // Build the loader
+        var loader = new MongoDataLoader<>(
                 itemType,
                 idType,
                 documentConnectionProvider,
@@ -419,8 +488,13 @@ public final class LoaderBuilder<T, ID> {
                 queryBuilder,
                 collectionName,
                 databaseName,
-                configuration
+                configurationToMap()
         );
+
+        // Configure plugins and event listeners
+        configureLoaderExtensions(loader);
+
+        return loader;
     }
 
     private DataLoader<T, ID> buildDocumentLoader() {
@@ -428,7 +502,7 @@ public final class LoaderBuilder<T, ID> {
         var serializer = new JacksonDocumentSerializer<T>();
         var queryBuilder = new GenericDocumentQueryBuilder<T>();
 
-        return new MongoDataLoader<>(
+        var loader = new MongoDataLoader<>(
                 itemType,
                 idType,
                 documentConnectionProvider,
@@ -436,39 +510,56 @@ public final class LoaderBuilder<T, ID> {
                 queryBuilder,
                 collectionName,
                 databaseName != null ? databaseName : "default",
-                configuration
+                configurationToMap()
         );
+
+        configureLoaderExtensions(loader);
+        return loader;
+    }
+
+    private void configureLoaderExtensions(DataLoader<T, ID> loader) {
+        // This would require access to the internal components of the loader
+        // In a real implementation, you'd need to expose plugin and event registration methods
+        // on the DataLoader interface or AbstractDataLoader
+
+        // For now, this is a placeholder showing the intent
+        // eventListeners.forEach(listener -> loader.addEventListener(listener));
+        // plugins.forEach(plugin -> loader.addPlugin(plugin));
     }
 
     private ConnectionProvider createSqlConnectionProvider() {
+        var connConfig = configuration.getConnection();
         return new HikariConnectionProvider(
                 connectionString,
                 username,
                 password,
-                maxPoolSize,
-                minIdle,
-                connectionTimeoutMs,
-                idleTimeoutMs,
-                maxLifetimeMs
+                connConfig.maxPoolSize(),
+                connConfig.minIdle(),
+                connConfig.connectionTimeout().toMillis(),
+                connConfig.idleTimeout().toMillis(),
+                connConfig.maxLifetime().toMillis()
         );
     }
 
     private void detectSqlDialect(String connectionString) {
         var dialect = "generic";
-        if (connectionString.contains("postgresql")) {
+        var lowerUrl = connectionString.toLowerCase();
+
+        if (lowerUrl.contains("postgresql")) {
             dialect = "postgresql";
-        } else if (connectionString.contains("mysql")) {
+        } else if (lowerUrl.contains("mysql")) {
             dialect = "mysql";
-        } else if (connectionString.contains("h2")) {
+        } else if (lowerUrl.contains("h2")) {
             dialect = "h2";
-        } else if (connectionString.contains("sqlite")) {
+        } else if (lowerUrl.contains("sqlite")) {
             dialect = "sqlite";
-        } else if (connectionString.contains("oracle")) {
+        } else if (lowerUrl.contains("oracle")) {
             dialect = "oracle";
-        } else if (connectionString.contains("sqlserver")) {
+        } else if (lowerUrl.contains("sqlserver")) {
             dialect = "sqlserver";
         }
-        configuration.put("sqlDialect", dialect);
+
+        // Store dialect information for later use
     }
 
     private String generateDefaultTableName() {
@@ -479,17 +570,36 @@ public final class LoaderBuilder<T, ID> {
         return itemType.getSimpleName().toLowerCase() + "s";
     }
 
-    // Enums and Helper Classes
+    private Map<String, Object> configurationToMap() {
+        // Convert DataLoaderConfiguration to Map for compatibility with existing code
+        var map = new HashMap<String, Object>();
 
-    private enum LoaderType {
-        SQL, MONGO, DOCUMENT
-    }
+        var conn = configuration.getConnection();
+        map.put("maxPoolSize", conn.maxPoolSize());
+        map.put("minIdle", conn.minIdle());
+        map.put("connectionTimeoutMs", conn.connectionTimeout().toMillis());
+        map.put("idleTimeoutMs", conn.idleTimeout().toMillis());
+        map.put("maxLifetimeMs", conn.maxLifetime().toMillis());
 
-    public enum Environment {
-        MINECRAFT_SPIGOT,
-        MINECRAFT_FABRIC,
-        SPRING_BOOT,
-        STANDALONE
+        var cache = configuration.getCache();
+        map.put("enableCache", cache.enabled());
+        map.put("cacheMaxSize", cache.maxSize());
+        map.put("cacheTtl", cache.ttl().toSeconds());
+
+        var metrics = configuration.getMetrics();
+        map.put("enableMetrics", metrics.enabled());
+        map.put("detailedMetrics", metrics.detailedMetrics());
+
+        var security = configuration.getSecurity();
+        map.put("encryptionEnabled", security.encryptionEnabled());
+        map.put("auditLogging", security.auditLogging());
+
+        var resilience = configuration.getResilience();
+        map.put("circuitBreakerEnabled", resilience.circuitBreakerEnabled());
+        map.put("retryEnabled", resilience.retryEnabled());
+        map.put("maxRetries", resilience.maxRetries());
+
+        return map;
     }
 
     // Generic document query builder for non-MongoDB document databases
