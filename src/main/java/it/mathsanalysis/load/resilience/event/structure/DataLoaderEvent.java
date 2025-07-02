@@ -1,4 +1,3 @@
-// ===== src/main/java/it/mathsanalysis/load/event/DataLoaderEvent.java =====
 package it.mathsanalysis.load.resilience.event.structure;
 
 import lombok.Getter;

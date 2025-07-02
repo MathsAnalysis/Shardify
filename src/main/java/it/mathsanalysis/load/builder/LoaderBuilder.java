@@ -97,8 +97,6 @@ public final class LoaderBuilder<T, ID> {
         this.configuration = DataLoaderConfiguration.defaults();
     }
 
-    // ===== Factory Methods =====
-
     /**
      * Start building a loader for the specified types
      *
@@ -139,7 +137,6 @@ public final class LoaderBuilder<T, ID> {
         return new LoaderBuilder<>(itemType, idType);
     }
 
-    // ===== Configuration Methods =====
 
     /**
      * Configure with pre-built DataLoaderConfiguration
@@ -156,8 +153,6 @@ public final class LoaderBuilder<T, ID> {
         this.configuration = DataLoaderConfiguration.forEnvironment(environment);
         return this;
     }
-
-    // ===== SQL Database Configuration =====
 
     /**
      * Configure for SQL database with connection string and auto-detection
@@ -209,8 +204,6 @@ public final class LoaderBuilder<T, ID> {
         return new DocumentConfigurationBuilder<>(this);
     }
 
-    // ===== Caching Configuration =====
-
     /**
      * Enable caching with default configuration
      */
@@ -231,8 +224,6 @@ public final class LoaderBuilder<T, ID> {
         if (maxSize <= 0) throw new IllegalArgumentException("Cache max size must be positive");
         return this;
     }
-
-    // ===== Plugin and Event Configuration =====
 
     /**
      * Add event listener for customization
@@ -301,7 +292,6 @@ public final class LoaderBuilder<T, ID> {
         return this;
     }
 
-    // ===== Environment-Specific Presets =====
 
     /**
      * Configure for Minecraft environment with optimizations
@@ -386,8 +376,6 @@ public final class LoaderBuilder<T, ID> {
         return this;
     }
 
-    // ===== Build Methods =====
-
     /**
      * Build the configured data loader with validation
      */
@@ -440,8 +428,6 @@ public final class LoaderBuilder<T, ID> {
         var config = createFinalConfiguration();
         return new BuildResult<>(loader, config, getValidationResults());
     }
-
-    // ===== Inner Configuration Builders =====
 
     /**
      * SQL-specific configuration builder
@@ -607,8 +593,6 @@ public final class LoaderBuilder<T, ID> {
             return parent.build();
         }
     }
-
-    // ===== Private Implementation Methods =====
 
     private void validateConfiguration() {
         if (validated) return;

@@ -1,4 +1,3 @@
-// ===== spi/connection/DocumentConnectionProvider.java =====
 package it.mathsanalysis.load.spi.connection;
 
 import it.mathsanalysis.load.spi.database.Collection;

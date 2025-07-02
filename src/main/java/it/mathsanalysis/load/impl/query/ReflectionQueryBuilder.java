@@ -1,4 +1,3 @@
-// ===== Aggiornamento ReflectionQueryBuilder con metodi mancanti =====
 package it.mathsanalysis.load.impl.query;
 
 import it.mathsanalysis.load.spi.query.QueryBuilder;
@@ -222,8 +221,6 @@ public final class ReflectionQueryBuilder<T> implements QueryBuilder<T> {
         recordQueryPerformance("buildCountQuery", System.nanoTime() - startTime);
         return Query.select(sql, new ArrayList<>(criteria.values()));
     }
-
-    // ===== NEW METHODS - Previously missing =====
 
     @Override
     public Query buildExistsQuery(Map<String, Object> criteria) {
@@ -607,8 +604,6 @@ public final class ReflectionQueryBuilder<T> implements QueryBuilder<T> {
         recordQueryPerformance("buildDropConstraintQuery", System.nanoTime() - startTime);
         return Query.ddl(sql);
     }
-
-    // ===== EXISTING METHODS =====
 
     @Override
     public Map<String, Integer> getCacheStats() {
