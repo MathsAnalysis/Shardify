@@ -14,16 +14,17 @@ version = '1.0.0'
 
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(23))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 
 tasks.withType(Test).configureEach {
     jvmArgs += '--enable-preview'
+    useJUnitPlatform()
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs += ['--enable-preview']
-    options.release = 23
+    options.release = 21
 }
 
 repositories {
