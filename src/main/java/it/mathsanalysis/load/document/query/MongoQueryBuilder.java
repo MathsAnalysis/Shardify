@@ -302,6 +302,9 @@ public final class MongoQueryBuilder<T> implements DocumentQueryBuilder<T> {
             return newVal;
         });
 
+        // keep track of the total number of built queries
+        queryStats.merge("total_queries", 1L, (o, n) -> o instanceof Long ? (Long) o + (Long) n : n);
+
         queryStats.put("last_query_type", queryType);
         queryStats.put("last_query_time", System.currentTimeMillis());
     }
