@@ -195,7 +195,7 @@ userLoader.saveAsync(user, Map.of())
 
 ```java
 // Process large datasets with reactive streams
-var userPublisher = Flow.publisher(generateLargeUserDataset());
+Flow.Publisher<User> userPublisher = generateLargeUserDataset();
 
 userLoader.saveBatchAsync(userPublisher, Map.of("batchSize", 500))
     .thenAccept(batchResult -> {
