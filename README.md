@@ -232,15 +232,10 @@ System.out.println("Cache hit rate: " + stats.hitRate() * 100 + "%");
 ```java
 var loader = LoaderBuilder.forType(User.class, Long.class)
     .withSqlConnection("jdbc:postgresql://localhost:5432/mydb")
-    .withAdvancedConnectionPool(
-        50,     // max pool size
-        10,     // min idle
-        30000,  // connection timeout (ms)
-        600000, // idle timeout (ms)
-        1800000 // max lifetime (ms)
-    )
-    .withQueryCache(true)
-    .withBatchSize(1000)
+    .withConnectionPool(50, 10)
+    .withTimeouts(Duration.ofMillis(30000), Duration.ofMinutes(10))
+    .withProperty("maxLifetime", Duration.ofMinutes(30))
+    .withCaching("user-cache")
     .build();
 ```
 
@@ -250,7 +245,7 @@ var loader = LoaderBuilder.forType(User.class, Long.class)
 // Minecraft Plugin optimization
 var minecraftLoader = LoaderBuilder.forType(PlayerData.class, UUID.class)
     .withSqlConnection("jdbc:sqlite:plugins/MyPlugin/data.db")
-    .forMinecraftOptimization("MyPlugin")
+    .forMinecraft("MyPlugin")
     .build();
 
 // Spring Boot integration
@@ -264,7 +259,9 @@ var springLoader = LoaderBuilder.forType(Entity.class, Long.class)
 var prodLoader = LoaderBuilder.forType(Order.class, Long.class)
     .withSqlConnection("jdbc:postgresql://prod-db:5432/orders")
     .forHighPerformance()
-    .withAdvancedConnectionPool(100, 20, 5000, 300000, 900000)
+    .withConnectionPool(100, 20)
+    .withTimeouts(Duration.ofMillis(5000), Duration.ofMinutes(5))
+    .withProperty("maxLifetime", Duration.ofMinutes(15))
     .build();
 ```
 
@@ -304,7 +301,7 @@ public class PlayerDataManager {
     public PlayerDataManager(JavaPlugin plugin) {
         this.loader = LoaderBuilder.forType(PlayerData.class, UUID.class)
             .withSqlConnection("jdbc:sqlite:" + plugin.getDataFolder() + "/playerdata.db")
-            .forMinecraftOptimization(plugin.getName())
+            .forMinecraft(plugin.getName())
             .withTable("player_data")
             .build();
     }
