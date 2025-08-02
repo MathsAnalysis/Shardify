@@ -3,7 +3,6 @@
 [![Java](https://img.shields.io/badge/Java-23-orange.svg)](https://openjdk.java.net/projects/jdk/23/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-green.svg)](https://github.com/mathsanalysis/Shardify)
-[![](https://jitpack.io/v/MathsAnalysis/Shardify.svg)](https://jitpack.io/#MathsAnalysis/Shardify)
 
 **🚀 High-Performance Data Persistence for Modern Java Applications**
 
@@ -27,40 +26,40 @@ Shardify is a cutting-edge, high-performance data persistence library designed f
 <dependency>
     <groupId>it.mathsanalysis.load</groupId>
     <artifactId>shardify-load</artifactId>
-    <version>1.0.0</version>
+    <version>1.0</version>
 </dependency>
 ```
 
-### JitPack Repository
+### MathsAnalysis Repository
 
 #### Maven
-Add the JitPack repository to your `pom.xml`:
+Add the MathsAnalysis repository to your `pom.xml`:
 ```xml
 <repositories>
     <repository>
-        <id>jitpack.io</id>
-        <url>https://jitpack.io</url>
+        <id>mathsanalysis-repo</id>
+        <url>https://repo.mathsanalysis.com</url>
     </repository>
 </repositories>
 
 <dependencies>
     <dependency>
-        <groupId>com.github.MathsAnalysis</groupId>
-        <artifactId>Shardify</artifactId>
-        <version>v1.0.0</version>
+        <groupId>it.mathsanalysis.load</groupId>
+        <artifactId>shardify-load</artifactId>
+        <version>1.0</version>
     </dependency>
 </dependencies>
 ```
 
 #### Gradle
-Add JitPack repository to your `build.gradle`:
-```kotlin
+Add MathsAnalysis repository to your `build.gradle`:
+```groovy
 repositories {
-    maven { url 'https://jitpack.io' }
+    maven { url 'https://repo.mathsanalysis.com' }
 }
 
 dependencies {
-    implementation 'com.github.MathsAnalysis:Shardify:v1.0.0'
+    implementation 'it.mathsanalysis.load:shardify-load:1.0'
 }
 ```
 
@@ -68,23 +67,23 @@ dependencies {
 For `build.gradle.kts`:
 ```kotlin
 repositories {
-    maven("https://jitpack.io")
+    maven("https://repo.mathsanalysis.com")
 }
 
 dependencies {
-    implementation("com.github.MathsAnalysis:Shardify:v1.0.0")
+    implementation("it.mathsanalysis.load:shardify-load:1.0")
 }
 ```
 
 ### SBT (Scala)
 ```scala
-resolvers += "jitpack" at "https://jitpack.io"
-libraryDependencies += "com.github.MathsAnalysis" % "Shardify" % "v1.0.0"
+resolvers += "mathsanalysis-repo" at "https://repo.mathsanalysis.com"
+libraryDependencies += "it.mathsanalysis.load" % "shardify-load" % "1.0"
 ```
 
 **Requirements**: Java 23+ (uses preview features like records and pattern matching)
 
-> **Note**: JitPack builds directly from the GitHub repository, providing access to the latest releases and even specific commits. Use tagged releases (like `v1.0.0`) for stable versions, or specify a commit hash for bleeding-edge features.
+> **Note**: The MathsAnalysis repository provides direct access to the latest releases. Use tagged releases (like `1.0`) for stable versions.
 
 ## 🏃‍♂️ Quick Start
 
@@ -434,6 +433,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 - 💬 [GitHub Discussions](https://github.com/mathsanalysis/Shardify/discussions)
 - 🐛 [Issue Tracker](https://github.com/mathsanalysis/Shardify/issues)
 - 📧 [Email Support](mailto:carlo4340@outlook.it)
-- 📦 [JitPack Repository](https://jitpack.io/#MathsAnalysis/Shardify)
+- 📦 [MathsAnalysis Repository](https://repo.mathsanalysis.com)
 
 ---
