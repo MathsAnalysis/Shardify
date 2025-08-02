@@ -32,24 +32,19 @@ repositories {
 }
 
 dependencies {
-
-    compileOnly 'io.micrometer:micrometer-core:1.12.0'
-    compileOnly 'org.springframework.boot:spring-boot-starter:3.2.0'
-    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.2.0'
-
+    compileOnly 'io.micrometer:micrometer-core:1.16.0-M1'
 
     compileOnly 'org.projectlombok:lombok:1.18.38'
     annotationProcessor 'org.projectlombok:lombok:1.18.38'
 
-    implementation 'org.testcontainers:postgresql:1.19.0'
-    implementation 'org.junit.jupiter:junit-jupiter:5.10.0'
-    implementation 'org.testcontainers:junit-jupiter:1.19.0'
-
     implementation 'com.zaxxer:HikariCP:7.0.0'
-    implementation 'net.sf.trove4j:trove4j:3.0.3'
-    implementation 'it.unimi.dsi:fastutil-core:8.5.15'
-    implementation 'com.github.ben-manes.caffeine:caffeine:3.2.1'
+    implementation 'net.sf.trove4j:core:3.1.0'
+    implementation 'it.unimi.dsi:fastutil:8.5.16'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.2.2'
 
+    implementation 'ch.qos.logback:logback-classic:1.5.18'
+    implementation 'org.springframework.boot:spring-boot-starter:4.0.0-M1'
+    implementation 'org.springframework.boot:spring-boot-autoconfigure:4.0.0-M1'
 }
 
 tasks {

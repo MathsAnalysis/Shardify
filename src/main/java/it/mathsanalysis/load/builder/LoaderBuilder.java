@@ -915,6 +915,7 @@ public final class LoaderBuilder<T, ID> {
     }
 
 
+
     public record BuildResult<T, ID>(DataLoader<T, ID> loader, Map<String, Object> configuration, List<String> validationResults) {
 
         public void printValidationResults() {
